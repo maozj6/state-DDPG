@@ -14,6 +14,55 @@ import numpy as np
 from scipy.signal import savgol_filter
 
 
+def reward_fast_descent_v1(z, z_vel, z_min, z_max, zvel_min, zvel_max):
+    """
+    Version 1: Linear penalty on height and reward on downward velocity.
+    """
+    # Normalize z position and z velocity to [0, 1]
+    norm_z = (z - z_min) / (z_max - z_min)        # 0 = low altitude, 1 = high altitude
+    norm_zvel = (z_vel - zvel_min) / (zvel_max - zvel_min)  # 0 = fast downward, 1 = fast upward
+
+    # Reward favors low altitude and fast downward velocity
+    reward = -norm_z + (1 - norm_zvel)
+    return reward
+
+def reward_fast_descent_v2(z, z_vel, z_min, z_max, zvel_min, zvel_max):
+    """
+    Version 2: Emphasize fast downward velocity with a nonlinear (quadratic) reward.
+    """
+    # Normalize
+    norm_z = (z - z_min) / (z_max - z_min)
+    norm_zvel = (z_vel - zvel_min) / (zvel_max - zvel_min)
+
+    # Quadratic amplification on downward speed reward
+    reward = -norm_z + 2 * (1 - norm_zvel)**2
+    return reward
+
+def reward_fast_descent_v3(z, z_vel, z_min, z_max, zvel_min, zvel_max):
+    """
+    Version 3: Encourage velocity to fall within an ideal downward speed range.
+    """
+    # Define ideal downward velocity range (adjust as needed)
+    ideal_vel_low = -100  # m/s
+    ideal_vel_high = -50  # m/s
+
+    # Reward based on how close z_vel is to the ideal range
+    if z_vel < ideal_vel_low:
+        vel_reward = (z_vel - ideal_vel_low) / abs(ideal_vel_low)
+    elif z_vel > ideal_vel_high:
+        vel_reward = (ideal_vel_high - z_vel) / abs(ideal_vel_high)
+    else:
+        vel_reward = 1.0  # Perfect if within the range
+
+    vel_reward = max(vel_reward, 0)  # Clip to non-negative
+
+    # Penalize high altitude
+    norm_z = (z - z_min) / (z_max - z_min)
+
+    reward = vel_reward - norm_z
+    return reward
+
+
 def compute_reward_savgol(data, digit_number, window_length=21, polyorder=3):
     z_velocity = data[0, :, digit_number].cpu().numpy()  # shape: (150,)
 
